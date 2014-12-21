@@ -19,7 +19,7 @@ module type NONDET = sig
         You can write [a >>= fun x -> b] instead of [bind a (fun x -> b)]. *)
 
   val choice: 'a mon list -> 'a mon
-    (** Nondeterministic choice between zero, one or several possibilities.
+  (** Nondeterministic choice between zero, one or several possibilities.
         [choice al] nondeterministically choose one of the ['a mon]
         monadic computations given in the list [al]. *)
 
@@ -156,19 +156,28 @@ module Tree : NONDET = struct
 
 (** Monad operations *)
 
-  let ret (x: 'a): 'a mon = failwith "TODO"
+  let ret (x: 'a): 'a mon = fun () -> [Val x]
 
-  let rec bind (m: 'a mon) (f: 'a -> 'b mon): 'b mon = failwith "TODO"
+  let rec bind (m: 'a mon) (f: 'a -> 'b mon): 'b mon =
+    fun () ->
+      match m () with
+      | [] -> []
+      | h :: t ->
+	 (match h with
+	  | Val x -> f x ()
+	  | Susp m' -> [Susp (fun () -> bind m' f ())] @ (bind (fun () -> t) f) ())
+			  
 
   let (>>=) = bind
 
 (** Nondeterminism *)
 
-  let choice (al: 'a mon list) : 'a mon = failwith "TODO"
+  let choice (al: 'a mon list) : 'a mon = 
+    fun () -> List.concat (List.map (fun m -> m ()) al)
 
-  let fail : 'a mon = failwith "TODO"
+  let fail : 'a mon = fun () -> []
 
-  let either (a: 'a mon) (b: 'a mon): 'a mon = failwith "TODO"
+  let either (a: 'a mon) (b: 'a mon): 'a mon = choice [a;b]
 
   let (|||) = either
 
@@ -177,14 +186,29 @@ module Tree : NONDET = struct
     contained in the choice tree [m] up to depth [maxdepth]. 
     See project description for examples. *)
 
-  let flatten (maxdepth: int) (m: 'a mon) : 'a case list = failwith "TODO"
+  let flatten (maxdepth: int) (m: 'a mon) : 'a case list =
+    let rec flatten_aux i m =
+      match i with
+      | 0 -> m ()
+      | i ->
+        List.map (fun c -> match c with
+            | Val x -> [c]
+            | Susp m' -> flatten_aux (i-1) m') (m ())
+        |> List.flatten
+    in
+    flatten_aux maxdepth m
+
 
 (** [run maxdepth m] first calls [flatten maxdepth m] to explore
     the choice tree [m] to bounded depth [maxdepth].  Then it
     separates [Val] and [Susp] cases in the result of
     [flatten maxdepth m] to produce the expected result. *)
-
-  let run (maxdepth: int) (m: 'a mon) : 'a list * bool = failwith "TODO"
+  let run (maxdepth: int) (m: 'a mon) : 'a list * bool =
+    let (values, susp) = List.partition (fun c ->
+        match c with Val _ -> true | _ -> false) (flatten maxdepth m) in
+    (List.map (fun c -> match c with
+         | Val x -> x
+         | _ -> raise (Failure "")) values, susp = [])
 
   let print_run f depth m = print_run_aux f (run depth m)
 
@@ -225,7 +249,7 @@ module type NONDET_WITH_STATE = sig
 end
 
 (** Implementation of the state-and-choice-tree monad. *)
-
+let () = failwith "TODO"
 module TreeState : NONDET_WITH_STATE = struct
 
   type 'a mon = Store.t -> ('a case * Store.t) list

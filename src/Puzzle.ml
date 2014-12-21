@@ -1,6 +1,6 @@
 (** The bridge crossing puzzle *)
 
-open Nondet.Naive   (* or:  open Nondet.Tree *)
+open Naive   (* or:  open Nondet.Tree *)
 
 type band_member = Bono | Edge | Adam | Larry
 
@@ -23,17 +23,48 @@ let walking_time = function
   all the ways to decompose it into one element and the list of the
   other elements. *)
 
-let rec take_one (l: 'a list) : ('a * 'a list) mon = failwith "TODO"
+let rec take_one (l: 'a list) : ('a * 'a list) mon =
+  let rec aux l hl =
+    match l with
+    | [] -> fail
+    | h :: t -> (ret (h, hl @ t)) ||| (aux t (hl @ [h]))
+  in
+    aux l []
 
 (** Likewise, but decomposes the list in two distinct elements and
   the list of the other elements. *)
+(** Considers (x,y,xs) = (y,x,xs). Arbitrary chooses
+ (x,y,xs) such that x < y. *)
+  
+let rec take_two (l: 'a list) : ('a * 'a * 'a list) mon =
+  take_one l >>=
+    fun (x, xs) ->
+    take_one xs >>= fun (y,ys) ->
+      if (walking_time x < walking_time y) then ret (x,y,ys) else fail
 
-let rec take_two (l: 'a list) : ('a * 'a * 'a list) mon = failwith "TODO"
-
+let trace_cost tr =
+  List.fold_left (fun acc a -> match a with
+			       | Back x -> acc + (walking_time x)
+			       | Forth (x,y) ->
+				  acc + (max (walking_time x) (walking_time y))) 0 tr
+  
 (** The solution to the puzzle! *)
 
-let solution: trace mon = failwith "TODO"
-
+let solution: trace mon =
+  let rec aux comp =
+    bind comp (fun (tr, left, crossed) ->
+	       match tr, left with
+	       | _, [] -> ret (tr, [], crossed)
+	       | [], _ | ((Back _) :: _), _ ->
+		  aux (take_two left >>=
+			 fun (x,y,xs) -> ret ((Forth (x,y)) :: tr, xs, x :: y :: crossed))
+	       | ((Forth _) :: _), _ ->
+		  aux (take_one crossed >>=
+			 fun (x,xs) -> ret ((Back x) :: tr, x :: left, xs)))
+  in
+  aux (ret ([],[Bono;Edge;Adam;Larry],[])) >>=
+    (fun (x,y,z) -> if trace_cost x > 17 then fail else ret x)				
+		  
 (** Printing the solution *)
 
 open Printf
