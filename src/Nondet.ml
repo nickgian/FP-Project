@@ -165,15 +165,15 @@ module Tree : NONDET = struct
       | h :: t ->
 	 (match h with
 	  | Val x -> f x ()
-	  | Susp m' -> [Susp (fun () -> bind m' f ())] @ (bind (fun () -> t) f) ())
-			  
+	  | Susp m' -> [Susp (fun () -> bind m' f ())]) @ ((bind (fun () -> t) f) ())
+  (*try susp on bind recurse*)
 
   let (>>=) = bind
 
 (** Nondeterminism *)
 
   let choice (al: 'a mon list) : 'a mon = 
-    fun () -> List.concat (List.map (fun m -> m ()) al)
+    fun () -> List.flatten (List.map (fun m -> m ()) al)
 
   let fail : 'a mon = fun () -> []
 
@@ -222,7 +222,7 @@ end
 (** {2 Adding local state to the choice tree monad} *)
 
 (** Signature for the additional operations. *)
-
+(*
 module type NONDET_WITH_STATE = sig
   include NONDET
 
@@ -249,7 +249,6 @@ module type NONDET_WITH_STATE = sig
 end
 
 (** Implementation of the state-and-choice-tree monad. *)
-let () = failwith "TODO"
 module TreeState : NONDET_WITH_STATE = struct
 
   type 'a mon = Store.t -> ('a case * Store.t) list
@@ -305,5 +304,5 @@ module TreeState : NONDET_WITH_STATE = struct
 
   let rec fixmemo (f: 'a mon -> 'a mon) : 'a mon = failwith "TODO"
 
-end 
+end *)
  
