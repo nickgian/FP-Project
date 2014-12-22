@@ -163,10 +163,11 @@ module Tree : NONDET = struct
       match m () with
       | [] -> []
       | h :: t ->
-	 (match h with
-	  | Val x -> f x ()
-	  | Susp m' -> [Susp (fun () -> bind m' f ())]) @ ((bind (fun () -> t) f) ())
-  (*try susp on bind recurse*)
+        let v =
+          match h with
+          | Val x -> f x ()
+          | Susp m' -> [Susp (fun () -> bind m' f ())] in
+        v @ [Susp (fun () -> (bind (fun () -> t) f) ())]
 
   let (>>=) = bind
 
