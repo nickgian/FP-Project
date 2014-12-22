@@ -1,7 +1,7 @@
 (** The bridge crossing puzzle *)
 
 (* open Naive   (\* or:  open Nondet.Tree *\) *)
-open Tree
+open Nondet.Tree
 
 type band_member = Bono | Edge | Adam | Larry
 

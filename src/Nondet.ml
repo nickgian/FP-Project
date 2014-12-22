@@ -173,8 +173,11 @@ module Tree : NONDET = struct
 
 (** Nondeterminism *)
 
+  (* let choice (al: 'a mon list) : 'a mon =  *)
+  (*   fun () -> List.flatten (List.map (fun m -> m ()) al) *)
+
   let choice (al: 'a mon list) : 'a mon = 
-    fun () -> List.flatten (List.map (fun m -> m ()) al)
+      fun () -> List.map (fun m -> Susp m) al
 
   let fail : 'a mon = fun () -> []
 
@@ -215,9 +218,11 @@ module Tree : NONDET = struct
 
 (** Fixpoint operators *)
 
-  let fix (f: 'a mon -> 'a mon) : 'a mon = failwith "TODO"
+  let fix (f: 'a mon -> 'a mon) : 'a mon =
+    let rec x = fun () -> f x () in x
 
-  let fixparam (f: ('a -> 'b mon) -> ('a -> 'b mon)) : 'a -> 'b mon = failwith "TODO"
+  let fixparam (f: ('a -> 'b mon) -> ('a -> 'b mon)) : 'a -> 'b mon =
+    let rec x = fun a () -> f x a () in x
 end
 
 (** {2 Adding local state to the choice tree monad} *)
