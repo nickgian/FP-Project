@@ -38,12 +38,39 @@ let type_of_var (env: typenv) (v: var) : typ option =
 (** [typeof env a] computes (nondeterministically) the possible type(s)
   for term [a] in environment [env]. *)
 
-let rec typeof (env: typenv) (a: term) : typ mon = failwith "TODO"
-
+let rec typeof (env: typenv) (a: term) : typ mon =
+  match a with
+    | Const _ -> ret Int
+    | Var s ->
+      (match type_of_var env s with
+        | Some tau -> ret tau
+        | None -> fail)
+    | Lam (x, t) ->
+      any_typ >>= (fun tau1 ->
+        (typeof ((x, tau1) :: env) t) >>= (fun tau2 -> ret (Fun (tau1, tau2))))
+    | App (t1, t2) ->
+      (typeof env t1) >>= (fun tau1 ->
+        match tau1 with
+          | Fun (tau1', tau1'') ->
+            checktype env t2 tau1' >>= (fun b -> if b = () then ret tau1''
+                                             else fail)
+          | _ -> fail)
+              
+      
 (** [checktype env a t] returns [()] if term [a] has type [t] in
   environment [env], and fails otherwise. *)
 
-and checktype (env: typenv) (a: term) (t: typ) : unit mon = failwith "TODO"
+and checktype (env: typenv) (a: term) (t: typ) : unit mon =
+  match a with
+    | Const _ -> if t = Int then ret () else fail
+    | Var s -> if (type_of_var env s) = Some t then ret () else fail
+    | Lam (x, m) ->
+      (match t with
+        | Fun (tau1, tau2) ->
+          typeof ((x, tau1) :: env) m >>= (fun taum -> if taum = tau2 then ret () else fail)
+        | _ -> fail)
+    | App (m, n) -> (typeof env a) >>= (fun tau -> if tau = t then ret () else fail)
+                  
 
 let types_of_closed_term a = typeof [] a
 
@@ -82,18 +109,25 @@ let var_x (n: int) : var = "x" ^ string_of_int n
 
 (** [any_term n] generates terms whose free variables are among
     [var_x 0] ... [var_x (n-1)]. *)
-
+(* terms produced currently have free/captured variables up to n.
+   Ask if captured variables can be unbounded and change rule for lambda *)
 let any_term : int -> term mon = fixparam (fun any_term n ->
     ret (Const 42)
-|||
-    (any_int_below n >>= (fun v -> ret (Var (var_x n))))
-|||
-    failwith "TODO"
+    |||
+    (any_int_below n >>= (fun v -> ret (Var (var_x v))))
+    |||
+    (any_int_below n >>= (fun v -> (any_term n) >>=
+                           (fun t -> ret (Lam ((var_x v), t)))))
+    |||
+    (any_term n >>= (fun t1 -> (any_term n) >>= (fun t2 -> ret (App (t1, t2))))))
 
 (** Generate closed terms that have type [t]. *)
 
-let closed_terms_of_type t : term mon = failwith "TODO"
-
+let closed_terms_of_type t : term mon =
+  any_term 10 >>= (fun tm ->
+      checktype [] tm t
+      >>= fun b -> if b = () then ret tm else fail)
+                  
 (* Printing of terms *)
 
 let rec print_term = function

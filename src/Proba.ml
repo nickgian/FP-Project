@@ -92,13 +92,24 @@ module Tree : PROBA = struct
   type 'a mon = unit -> 'a case distribution
   and 'a case = Val of 'a | Susp of 'a mon
 
-  let ret (x: 'a) : 'a mon = failwith "TODO"
+  let ret (x: 'a) : 'a mon = fun () -> [(Val x, 1.0)]
 
-  let rec bind (m: 'a mon) (f: 'a -> 'b mon): 'b mon = failwith "TODO"
-
+  let rec bind (m: 'a mon) (f: 'a -> 'b mon): 'b mon =
+    fun () ->
+      match m () with
+        | [] -> []
+        | h :: t ->
+          let v =
+            match h with
+              | (Val x, p) -> f x ()
+              | (Susp m', p) -> [(Susp (fun () -> bind m' f ()), p)]
+          in
+            v @ [(Susp (fun () -> (bind (fun () -> t) f) ()), 1.0)]
+  (*does probability for Susp matter?*)
+                
   let (>>=) = bind
 
-  let fail : 'a mon = failwith "TODO"
+  let fail : 'a mon = fun () -> []
 
   let observe (b: bool) : unit mon =
     if b then ret () else fail
