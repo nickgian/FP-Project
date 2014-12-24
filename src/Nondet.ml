@@ -161,14 +161,13 @@ module Tree : NONDET = struct
   let rec bind (m: 'a mon) (f: 'a -> 'b mon): 'b mon =
     fun () ->
       match m () with
-      | [] -> []
-      | h :: t ->
-        let v =
-          match h with
-          | Val x -> Susp (f x)
-          | Susp m' -> Susp (fun () -> bind m' f ()) in
-          v :: [Susp (fun () -> (bind (fun () -> t) f) ())]
-          (* (bind (fun () -> t) f ()) *)
+        | [] -> []
+        | h :: t ->
+          let v =
+            match h with
+              | Val x -> Susp (f x)
+              | Susp m' -> Susp (bind m' f) in
+            v :: [Susp (bind (fun () -> t) f)]
 
   let (>>=) = bind
 
@@ -273,9 +272,9 @@ module TreeState : NONDET_WITH_STATE = struct
         | (h, s') :: t ->
           let v =
             match h with
-              | Val x -> f x s'
-              | Susp m' -> [(Susp (fun s -> bind m' f s), s')] in
-            v @ [(Susp (fun s -> (bind (fun s -> t) f) s), s)]
+              | Val x -> (Susp (f x), s')
+              | Susp m' -> (Susp (bind m' f), s') in
+            v :: [(Susp (bind (fun s -> t) f), s)]
                 
   let (>>=) = bind
 

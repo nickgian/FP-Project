@@ -101,11 +101,13 @@ module Tree : PROBA = struct
         | h :: t ->
           let v =
             match h with
-              | (Val x, p) -> f x ()
-              | (Susp m', p) -> [(Susp (fun () -> bind m' f ()), p)]
+              | (Val x, p) -> (Susp (f x), p)
+              | (Susp m', p) -> (Susp (bind m' f), p)
           in
-            v @ [(Susp (fun () -> (bind (fun () -> t) f) ()), 1.0)]
-  (*does probability for Susp matter?*)
+            v :: [(Susp (bind (fun () -> t) f), 1.0)]
+             (* (bind (fun () -> t) f ())  *)
+  (*does probability for Susp matter? 
+    Probably not, we can quickcheck with eager version*)
                 
   let (>>=) = bind
 
@@ -121,7 +123,7 @@ module Tree : PROBA = struct
     distr [(true, p); (false, 1.0 -. p)]
 
   let uniform (lo: int) (hi: int) : int mon =
-    let p = float_of_int (hi - lo + 1) in
+    let p = 1. /. (float_of_int (hi - lo + 1)) in
     let rec mk_list i acc =
       let elm = (i, p) in
         if i = lo then List.rev (elm :: acc) else mk_list (i-1) (elm :: acc)
@@ -131,9 +133,27 @@ module Tree : PROBA = struct
   let choose (p: prob) (a: 'a mon) (b: 'a mon) : 'a mon =
     fun () -> [(Susp a, p); (Susp b, 1. -. p)]
 
-  let flatten (maxdepth: int) (m: 'a mon) : 'a case distribution = failwith "TODO"
+  let flatten (maxdepth: int) (m: 'a mon) : 'a case distribution =
+    let rec flatten_aux i m p =
+      match i with
+        | 0 -> m ()
+        | i ->
+          List.map (fun c -> match c with
+              | (Val x, p') -> [(Val x, p' *. p)]
+              | (Susp m', p') -> flatten_aux (i-1) m' (p*.p')) (m ())
+          |> List.flatten
+    in
+      flatten_aux maxdepth m 1.0
 
-  let run (maxdepth: int) (m: 'a mon) : 'a distribution * prob = failwith "TODO"
+  let run (maxdepth: int) (m: 'a mon) : 'a distribution * prob =
+    List.filter (fun c ->
+        match c with (Val _, _) -> true | _ -> false) (flatten maxdepth m)
+    |> remove_dups |>
+    List.fold_left (fun (d, tp) c ->
+        match c with
+          | (Val x, p) -> ((x, p) :: d, (1. -. p) *. tp)
+          | _ -> raise (Failure "")) ([], 1.0)
+    |> normalize
 
   let print_run f depth m = print_run_aux f (run depth m)
 
