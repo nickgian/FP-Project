@@ -17,4 +17,4 @@ let sum_less_than_5 =
 let print_2_int (i1, i2) = printf "%d, %d" i1 i2
 
 let _ =
-  print_run print_2_int 30 sum_less_than_5
+  print_run print_2_int 20 sum_less_than_5

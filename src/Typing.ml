@@ -67,9 +67,11 @@ and checktype (env: typenv) (a: term) (t: typ) : unit mon =
     | Lam (x, m) ->
       (match t with
         | Fun (tau1, tau2) ->
-          typeof ((x, tau1) :: env) m >>= (fun taum -> if taum = tau2 then ret () else fail)
+          typeof ((x, tau1) :: env) m >>=
+          (fun taum -> if taum = tau2 then ret () else fail)
         | _ -> fail)
-    | App (m, n) -> (typeof env a) >>= (fun tau -> if tau = t then ret () else fail)
+    | App (m, n) ->
+      (typeof env a) >>= (fun tau -> if tau = t then ret () else fail)
                   
 
 let types_of_closed_term a = typeof [] a

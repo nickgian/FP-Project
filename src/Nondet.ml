@@ -165,11 +165,13 @@ module Tree : NONDET = struct
       | h :: t ->
         let v =
           match h with
-          | Val x -> f x ()
-          | Susp m' -> [Susp (fun () -> bind m' f ())] in
-        v @ [Susp (fun () -> (bind (fun () -> t) f) ())]
+          | Val x -> Susp (f x)
+          | Susp m' -> Susp (fun () -> bind m' f ()) in
+          v :: [Susp (fun () -> (bind (fun () -> t) f) ())]
+          (* (bind (fun () -> t) f ()) *)
 
   let (>>=) = bind
+
 
 (** Nondeterminism *)
 
@@ -210,10 +212,10 @@ module Tree : NONDET = struct
   let run (maxdepth: int) (m: 'a mon) : 'a list * bool =
     let (values, susp) = List.partition (fun c ->
         match c with Val _ -> true | _ -> false) (flatten maxdepth m) in
-    (List.map (fun c -> match c with
-         | Val x -> x
-         | _ -> raise (Failure "")) values, susp = [])
-
+      (List.map (fun c -> match c with
+           | Val x -> x
+           | _ -> raise (Failure "")) values, susp = [])
+      
   let print_run f depth m = print_run_aux f (run depth m)
 
 (** Fixpoint operators *)
@@ -228,7 +230,7 @@ end
 (** {2 Adding local state to the choice tree monad} *)
 
 (** Signature for the additional operations. *)
-(*
+
 module type NONDET_WITH_STATE = sig
   include NONDET
 
@@ -262,19 +264,29 @@ module TreeState : NONDET_WITH_STATE = struct
 
 (** Monad operations *)
 
-  let ret (x: 'a): 'a mon = failwith "TODO"
+  let ret (x: 'a): 'a mon = fun s -> [(Val x, s)]
 
-  let rec bind (m: 'a mon) (f: 'a -> 'b mon): 'b mon = failwith "TODO"
-
+  let rec bind (m: 'a mon) (f: 'a -> 'b mon): 'b mon =
+    fun s ->
+      match m s with
+        | [] -> []
+        | (h, s') :: t ->
+          let v =
+            match h with
+              | Val x -> f x s'
+              | Susp m' -> [(Susp (fun s -> bind m' f s), s')] in
+            v @ [(Susp (fun s -> (bind (fun s -> t) f) s), s)]
+                
   let (>>=) = bind
 
 (** Nondeterminism *)
 
-  let choice (al: 'a mon list) : 'a mon = failwith "TODO"
+  let choice (al: 'a mon list) : 'a mon =
+    fun s -> List.map (fun m -> (Susp m, s)) al
 
-  let fail : 'a mon = failwith "TODO"
+  let fail : 'a mon = fun s -> []
 
-  let either (a: 'a mon) (b: 'a mon): 'a mon = failwith "TODO"
+  let either (a: 'a mon) (b: 'a mon): 'a mon = choice [a; b]
 
   let (|||) = either
 
@@ -284,23 +296,44 @@ module TreeState : NONDET_WITH_STATE = struct
 
   let newref: unit -> 'a ref = Store.newloc
   
-  let getref (l: 'a ref) : 'a mon = failwith "TODO"
+  let getref (l: 'a ref) : 'a mon =
+    fun s -> match Store.get s l with Some x -> [(Val x, s)] | _ -> fail s
 
-  let setref (l: 'a ref) (v: 'a) : unit mon = failwith "TODO"
+  let setref (l: 'a ref) (v: 'a) : unit mon =
+    fun s -> [(Val (), Store.put s l v)]
 
 (** Running a monadic computation *)
 
-  let flatten maxdepth (m: 'a mon) (s: Store.t) : ('a case * Store.t) list = failwith "TODO"
-
-  let run (maxdepth: int) (m: 'a mon) : 'a list * bool = failwith "TODO"
+  let flatten maxdepth (m: 'a mon) (s: Store.t) : ('a case * Store.t) list =
+    let rec flatten_aux i m s =
+      match i with
+        | 0 -> m s
+        | i ->
+          List.map (fun c -> match c with
+              | (Val x, s') -> [c]
+              | (Susp m', s') -> flatten_aux (i-1) m' s') (m s)
+          |> List.flatten
+    in
+      flatten_aux maxdepth m s
+    
+  let run (maxdepth: int) (m: 'a mon) : 'a list * bool =
+    let (values, susp) =
+      List.partition (fun c -> match c with (Val _, _) -> true | _ -> false )
+        (flatten maxdepth m Store.empty) in
+      (List.map (fun c -> match c with
+           | (Val x, s) -> x
+           | _ -> raise (Failure "")) values, susp = [])
+      
 
   let print_run f depth m = print_run_aux f (run depth m)
 
 (** Fixpoint operators *)
 
-  let fix (f: 'a mon -> 'a mon) : 'a mon = failwith "TODO"
+  let fix (f: 'a mon -> 'a mon) : 'a mon =
+    let rec x = fun s -> f x s in x
 
-  let fixparam (f: ('a -> 'b mon) -> ('a -> 'b mon)) : 'a -> 'b mon = failwith "TODO"
+  let fixparam (f: ('a -> 'b mon) -> ('a -> 'b mon)) : 'a -> 'b mon =
+    let rec x = fun a s -> f x a s in x
 
 (** Memoization of monadic computations.  See the last section of the
     project description.  Do not try to implement them before you
@@ -310,5 +343,5 @@ module TreeState : NONDET_WITH_STATE = struct
 
   let rec fixmemo (f: 'a mon -> 'a mon) : 'a mon = failwith "TODO"
 
-end *)
+end 
  

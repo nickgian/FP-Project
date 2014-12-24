@@ -114,14 +114,22 @@ module Tree : PROBA = struct
   let observe (b: bool) : unit mon =
     if b then ret () else fail
 
-  let distr (d: 'a distribution) : 'a mon = failwith "TODO"
+  let distr (d: 'a distribution) : 'a mon =
+    fun () -> List.map (fun x -> (Val (fst x), snd x)) d
 
   let flip (p: prob) : bool mon =
     distr [(true, p); (false, 1.0 -. p)]
 
-  let uniform (lo: int) (hi: int) : int mon = failwith "TODO"
+  let uniform (lo: int) (hi: int) : int mon =
+    let p = float_of_int (hi - lo + 1) in
+    let rec mk_list i acc =
+      let elm = (i, p) in
+        if i = lo then List.rev (elm :: acc) else mk_list (i-1) (elm :: acc)
+    in
+      distr (mk_list hi [])
 
-  let choose (p: prob) (a: 'a mon) (b: 'a mon) : 'a mon = failwith "TODO"
+  let choose (p: prob) (a: 'a mon) (b: 'a mon) : 'a mon =
+    fun () -> [(Susp a, p); (Susp b, 1. -. p)]
 
   let flatten (maxdepth: int) (m: 'a mon) : 'a case distribution = failwith "TODO"
 
@@ -130,5 +138,4 @@ module Tree : PROBA = struct
   let print_run f depth m = print_run_aux f (run depth m)
 
 end
-
 
