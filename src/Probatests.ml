@@ -14,7 +14,7 @@ let _3d6 : int mon =
 
 let _ =
   printf "--- 3d6\n";
-  print_run (fun n -> printf "%d" n) 10 _3d6
+  print_run (fun n -> printf "%d" n) 17 _3d6
 
 (** An observation that modifies a posteriori probabilities.
   We flip two coins and observe that they don't come up both with heads.
@@ -28,7 +28,7 @@ let not_both_true : (bool * bool) mon =
 
 let _ =
   printf "--- not both true\n";
-  print_run (fun (b1, b2) -> printf "%b, %b" b1 b2) 10 not_both_true
+  print_run (fun (b1, b2) -> printf "%b, %b" b1 b2) 20 not_both_true
 
 (** A probabilistic algorithm that terminates almost always.
   We pick an integer between 0 and 3 inclusive, and if 3 comes out

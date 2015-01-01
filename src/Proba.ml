@@ -105,7 +105,7 @@ module Tree : PROBA = struct
               | (Susp m', p) -> (Susp (bind m' f), p)
           in
             v :: [(Susp (bind (fun () -> t) f), 1.0)]
-             (* (bind (fun () -> t) f ())  *)
+             (* (bind (fun () -> t) f ()) *)
   (*does probability for Susp matter? 
     Probably not, we can quickcheck with eager version*)
                 
@@ -136,7 +136,9 @@ module Tree : PROBA = struct
   let flatten (maxdepth: int) (m: 'a mon) : 'a case distribution =
     let rec flatten_aux i m p =
       match i with
-        | 0 -> m ()
+        | 0 ->
+          List.map (fun c -> match c with
+              | (x, p') -> (x, p' *. p)) (m ())
         | i ->
           List.map (fun c -> match c with
               | (Val x, p') -> [(Val x, p' *. p)]
@@ -146,13 +148,16 @@ module Tree : PROBA = struct
       flatten_aux maxdepth m 1.0
 
   let run (maxdepth: int) (m: 'a mon) : 'a distribution * prob =
-    List.filter (fun c ->
-        match c with (Val _, _) -> true | _ -> false) (flatten maxdepth m)
-    |> remove_dups |>
-    List.fold_left (fun (d, tp) c ->
-        match c with
-          | (Val x, p) -> ((x, p) :: d, (1. -. p) *. tp)
-          | _ -> raise (Failure "")) ([], 1.0)
+    let (values, susp) = List.partition (fun c ->
+        match c with (Val _, _) -> true | _ -> false) (flatten maxdepth m) in
+      (List.fold_left (fun d c ->
+           match c with
+             | (Val x, p) -> (x, p) :: d
+             | _ -> raise (Failure "")) [] (remove_dups values),
+       List.fold_left (fun tp c ->
+           match c with
+             | (Susp _, p) -> p +. tp
+             | (Val _, _) -> raise (Failure "")) 0.0 susp)
     |> normalize
 
   let print_run f depth m = print_run_aux f (run depth m)
