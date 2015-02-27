@@ -29,6 +29,6 @@ let print_2_bool_list (l1, l2) =
   print_bool_list l1; printf ", "; print_bool_list l2
 
 let _ =
-  print_run print_2_bool_list 30 (split [true;true;true;false;false])
+  print_run print_2_bool_list 55 (split [true;true;true;false;false])
 
     

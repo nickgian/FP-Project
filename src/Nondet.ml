@@ -158,6 +158,8 @@ module Tree : NONDET = struct
 
   let ret (x: 'a): 'a mon = fun () -> [Val x]
 
+  (* Bind applies f to the head of m () lazily and creates a suspended
+     computation that binds f to the tail of m () *)                    
   let rec bind (m: 'a mon) (f: 'a -> 'b mon): 'b mon =
     fun () ->
       match m () with
@@ -165,7 +167,7 @@ module Tree : NONDET = struct
         | h :: t ->
           let v =
             match h with
-              | Val x -> Susp (f x)
+              | Val x -> Susp (fun () -> f x ())
               | Susp m' -> Susp (bind m' f) in
             v :: [Susp (bind (fun () -> t) f)]
 
@@ -213,17 +215,17 @@ module Tree : NONDET = struct
         match c with Val _ -> true | _ -> false) (flatten maxdepth m) in
       (List.map (fun c -> match c with
            | Val x -> x
-           | _ -> raise (Failure "")) values, susp = [])
+           | _ -> raise (Failure "")) (sort_uniq values), susp = [])
       
   let print_run f depth m = print_run_aux f (run depth m)
 
 (** Fixpoint operators *)
-
+  
   let fix (f: 'a mon -> 'a mon) : 'a mon =
-    let rec x = fun () -> f x () in x
+    let rec x = fun () -> [Susp (fun () -> f x ())] in x
 
   let fixparam (f: ('a -> 'b mon) -> ('a -> 'b mon)) : 'a -> 'b mon =
-    let rec x = fun a () -> f x a () in x
+    let rec x = fun a () -> [Susp (fun () -> f x a ())] in x
 end
 
 (** {2 Adding local state to the choice tree monad} *)
@@ -272,7 +274,7 @@ module TreeState : NONDET_WITH_STATE = struct
         | (h, s') :: t ->
           let v =
             match h with
-              | Val x -> (Susp (f x), s')
+              | Val x -> (Susp (fun s -> f x s), s')
               | Susp m' -> (Susp (bind m' f), s') in
             v :: [(Susp (bind (fun s -> t) f), s)]
                 
@@ -296,10 +298,12 @@ module TreeState : NONDET_WITH_STATE = struct
   let newref: unit -> 'a ref = Store.newloc
   
   let getref (l: 'a ref) : 'a mon =
-    fun s -> match Store.get s l with Some x -> [(Val x, s)] | _ -> fail s
+    fun s ->
+      [(Susp (fun s ->
+           match Store.get s l with Some x -> [(Val x, s)] | _ -> fail s), s)]
 
   let setref (l: 'a ref) (v: 'a) : unit mon =
-    fun s -> [(Val (), Store.put s l v)]
+    fun s -> [(Susp (fun s -> [(Val (), Store.put s l v)]), s)]
 
 (** Running a monadic computation *)
 
@@ -317,30 +321,54 @@ module TreeState : NONDET_WITH_STATE = struct
     
   let run (maxdepth: int) (m: 'a mon) : 'a list * bool =
     let (values, susp) =
-      List.partition (fun c -> match c with (Val _, _) -> true | _ -> false )
+      List.partition (fun c -> match c with (Val _, _) -> true | _ -> false)
         (flatten maxdepth m Store.empty) in
-      (List.map (fun c -> match c with
-           | (Val x, s) -> x
-           | _ -> raise (Failure "")) values, susp = [])
-      
+    let values' =
+      sort_uniq (List.map (fun c -> match c with
+          | (Val x, s) -> x
+          | _ -> raise (Failure "")) values) in
+      (values', susp = [])
+        
 
   let print_run f depth m = print_run_aux f (run depth m)
 
 (** Fixpoint operators *)
 
   let fix (f: 'a mon -> 'a mon) : 'a mon =
-    let rec x = fun s -> f x s in x
+    let rec x = fun s -> [(Susp (fun s -> f x s), s)] in x
 
   let fixparam (f: ('a -> 'b mon) -> ('a -> 'b mon)) : 'a -> 'b mon =
-    let rec x = fun a s -> f x a s in x
+    let rec x = fun a s -> [(Susp (fun s -> f x a s), s)] in x
 
 (** Memoization of monadic computations.  See the last section of the
     project description.  Do not try to implement them before you
     attack this last section. *)
 
-  let memo (a: 'a mon) : 'a mon = failwith "TODO"
+  let rec memo (a : 'a mon) : 'a mon =
+    let l = Store.newloc () in
+      fun s ->
+        match Store.get s l with
+          | None ->
+            List.map (fun (x, s') ->
+                match x with
+                  | Susp m ->
+                    let m' = memo m in
+                    (Susp m', Store.put s' l (Susp m'))
+                  | Val _ -> (x, Store.put s' l x)) (a s)
+          | Some a' -> [(a', s)]
 
-  let rec fixmemo (f: 'a mon -> 'a mon) : 'a mon = failwith "TODO"
-
+  let rec fixmemo (f: 'a mon -> 'a mon) : 'a mon =
+    let l = Store.newloc () in
+      fun s ->
+        match Store.get s l with
+          | None ->
+            List.map (fun (x, s') ->
+                match x with
+                  | Susp m ->
+                    let m' = memo m in
+                    (Susp m', Store.put s' l (Susp m'))
+                  | Val _ -> (x, Store.put s' l x)) (f (fixmemo f) s)
+          | Some a' -> [(a', s)]
+        
 end 
  

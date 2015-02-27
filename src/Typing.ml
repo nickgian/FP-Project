@@ -52,8 +52,7 @@ let rec typeof (env: typenv) (a: term) : typ mon =
       (typeof env t1) >>= (fun tau1 ->
         match tau1 with
           | Fun (tau1', tau1'') ->
-            checktype env t2 tau1' >>= (fun b -> if b = () then ret tau1''
-                                             else fail)
+            checktype env t2 tau1' >>= (fun () -> ret tau1'')
           | _ -> fail)
               
       

@@ -14,7 +14,7 @@ let _3d6 : int mon =
 
 let _ =
   printf "--- 3d6\n";
-  print_run (fun n -> printf "%d" n) 17 _3d6
+  print_run (fun n -> printf "%d" n) 20 _3d6
 
 (** An observation that modifies a posteriori probabilities.
   We flip two coins and observe that they don't come up both with heads.

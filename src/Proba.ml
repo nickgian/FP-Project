@@ -101,13 +101,12 @@ module Tree : PROBA = struct
         | h :: t ->
           let v =
             match h with
-              | (Val x, p) -> (Susp (f x), p)
+              | (Val x, p) -> (Susp (fun () -> f x ()), p)
               | (Susp m', p) -> (Susp (bind m' f), p)
           in
-            v :: [(Susp (bind (fun () -> t) f), 1.0)]
-             (* (bind (fun () -> t) f ()) *)
-  (*does probability for Susp matter? 
-    Probably not, we can quickcheck with eager version*)
+            v ::  [(Susp (bind (fun () -> t) f), 1.0)]
+  (*does probability for Susp matter? 1.0 is right..*)
+  (*do we want the last susp?*)
                 
   let (>>=) = bind
 

@@ -19,9 +19,14 @@ let any_bmlist = fix (fun any_bmlist ->
 let isnil (l: 'a mlist) : unit mon =
   l >>= function Nil -> ret () | Cons(_, _) -> fail
 
+let issingleton (l: 'a mlist) : unit mon =
+  l >>= function Nil -> fail | Cons(hd, tl) -> isnil tl
+
 let _ =
   printf "-- isnil\n";
-  print_run (fun () -> printf "OK!") 1000 (isnil any_bmlist)
+  print_run (fun () -> printf "OK!") 1000 (isnil any_bmlist);
+  printf "-- issingleton\n";
+  print_run (fun () -> printf "OK!") 1000 (issingleton any_bmlist)
 
 (** Operations over monadic lists *)
 
@@ -45,7 +50,7 @@ let rec mlist_eq (ml1: 'a mlist) (ml2: 'a mlist) : unit mon =
   function Nil -> (ml2 >>= function Nil -> ret ()
                                   | _ -> fail)
          | Cons (v1, ml1') ->
-           (ml2 >>= function 
+           (ml2 >>= function
              | Cons (v2, ml2') when v1=v2 -> mlist_eq ml1' ml2'
              | _ -> fail)
 
@@ -63,6 +68,7 @@ let _ =
 
 (** Adding memoization to the generation of boolean mlists *)
 
+
 let any_bmlist () : bool mlist = fixmemo (fun any_bmlist ->
  choice [nil; cons false any_bmlist; cons true any_bmlist])
 
@@ -70,6 +76,9 @@ let any_bmlist () : bool mlist = fixmemo (fun any_bmlist ->
 
 let nil_mlists =
   let l = any_bmlist() in isnil l >>= fun _ -> list_of_mlist l
+
+let singleton_mlists =
+  let l = any_bmlist() in issingleton l >>= fun _ -> list_of_mlist l
 
 (** Printing the results *)
 
@@ -82,13 +91,23 @@ let print_bool_list l =
 
 let _ =
   printf "-- nil_mlists\n";
-  print_run print_bool_list 1000 nil_mlists
+  print_run print_bool_list 1000 nil_mlists;
+  printf "-- singleton_mlists\n";
+  print_run print_bool_list 1000 singleton_mlists
 
 (** All possible ways to split a mlist into the concatenation of two
   mlists.  Returns the two mlists after conversion to normal lists,
   so that we can print the results. *)
 
-let split_mlist (ml: bool mlist) : (bool list * bool list) mon = failwith "TODO"
+let split_mlist (ml: bool mlist) : (bool list * bool list) mon =
+  let ml' = any_bmlist () in
+  let ml'' = any_bmlist () in
+    mlist_eq ml (append ml' ml'') >>=
+    fun () ->
+    list_of_mlist ml' >>=
+    fun l1 ->
+    list_of_mlist ml'' >>= fun l2 -> ret (l1, l2)
+
 
 (** Printing the results *)
 
